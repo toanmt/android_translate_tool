@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>String Translation Tool</title>
+    <style>
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        table, th, td {
+            border: 1px solid black;
+        }
+        th, td {
+            padding: 10px;
+            text-align: left;
+        }
+        #resultTable {
+            margin-top: 20px;
+        }
+        #downloadButton {
+            display: none;
+        }
+    </style>
+    <script>
+        const sourceLang = 'en'; // Source language
+        const supportedLanguages = [
+            { id: 'French', value: 'fr' },
+            { id: 'Spanish', value: 'es' },
+            { id: 'German', value: 'de' },
+            { id: 'Hindi', value: 'hi' },
+            { id: 'Japanese', value: 'ja' },
+            { id: 'Korean', value: 'ko' },
+            { id: 'Portuguese', value: 'pt' },
+            { id: 'Indonesian', value: 'id' },
+            { id: 'Filipino', value: 'tl' }
+        ];
+
+        async function translateText(targetLang, sourceText) {
+            const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=${sourceLang}&tl=${targetLang}&dt=t&q=${encodeURI(sourceText)}`;
+            try {
+                const response = await fetch(url);
+                if (!response.ok) {
+                    throw new Error('Network response was not ok');
+                }
+                const result = await response.json();
+                return result[0][0][0]; // Return the translated text
+            } catch (error) {
+                console.error('Error:', error);
+                return 'Error during translation';
+            }
+        }
+
+        async function performTranslation() {
+            const sourceText = document.getElementById('sourceText').value;
+            const lines = sourceText.split('\n');
+            const selectedLanguages = Array.from(document.querySelectorAll('input[type="checkbox"]:checked')).map(checkbox => supportedLanguages.find(lang => lang.id === checkbox.id));
+            const resultTable = document.getElementById('resultTable');
+
+            resultTable.innerHTML = '';
+
+            const zip = new JSZip();
+            let completedTranslations = 0;
+
+            for (const language of selectedLanguages) {
+                const translatedLines = [];
+                for (const line of lines) {
+                    const nameMatch = line.match(/<string name="(.+?)">(.+)<\/string>/);
+                    if (nameMatch) {
+                        const nameAttribute = nameMatch[1];
+                        const value = nameMatch[2];
+                        let translatedText = await translateText(language.value, value);
+
+                        // Replace single quotes with escaped single quotes
+                        translatedText = translatedText.replace(/'/g, "\\'");
+
+                        translatedLines.push(`<string name="${nameAttribute}">${translatedText}</string>`);
+                    }
+                }
+
+                const fileContent = `<?xml version="1.0" encoding="utf-8"?>\n<resources>\n${translatedLines.join('\n')}\n</resources>`;
+                zip.file(`values-${language.value}/strings.xml`, fileContent);
+
+                const row = document.createElement('tr');
+                const languageCell = document.createElement('td');
+                languageCell.textContent = language.id;
+
+                const copyButton = document.createElement('button');
+                copyButton.textContent = 'Copy';
+                copyButton.onclick = () => {
+                    navigator.clipboard.writeText(fileContent);
+                    alert('Copied to clipboard!');
+                };
+
+                languageCell.appendChild(copyButton);
+                row.appendChild(languageCell);
+
+                const translationCell = document.createElement('td');
+                translationCell.textContent = fileContent;
+                row.appendChild(translationCell);
+
+                resultTable.appendChild(row);
+
+                completedTranslations++;
+
+                // Show download button once all translations are done
+                if (completedTranslations === selectedLanguages.length) {
+                    const downloadButton = document.getElementById('downloadButton');
+                    downloadButton.style.display = 'block';
+                    downloadButton.onclick = () => {
+                        zip.generateAsync({ type: 'blob' }).then(content => {
+                            const a = document.createElement('a');
+                            a.href = URL.createObjectURL(content);
+                            a.download = 'translations.zip';
+                            a.click();
+                        });
+                    };
+                }
+            }
+        }
+    </script>
+</head>
+<body>
+    <h1>String Translation Tool</h1>
+    <div>
+        <textarea id="sourceText" placeholder="Enter strings to translate" rows="10" cols="50">
+<string name="may_be_later">Not now</string>
+<string name="thank_u">Thank you!</string>
+<string name="rate">Rate</string>
+        </textarea>
+    </div>
+    <div>
+        <h3>Select languages to translate to:</h3>
+        <div id="languageCheckboxes"></div>
+    </div>
+    <button onclick="performTranslation()">Translate</button>
+    <button id="downloadButton">Download ZIP</button>
+
+    <table id="resultTable">
+        <!-- Translated results will be displayed here -->
+    </table>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script>
+        const languageCheckboxesContainer = document.getElementById('languageCheckboxes');
+        supportedLanguages.forEach(lang => {
+            const checkbox = document.createElement('label');
+            checkbox.innerHTML = `<input type="checkbox" id="${lang.id}" value="${lang.value}"> ${lang.id}</label><br>`;
+            languageCheckboxesContainer.appendChild(checkbox);
+        });
+    </script>
+</body>
+</html>
