@@ -53,6 +53,7 @@
         }
 
         async function performTranslation() {
+            loadingSpinner.style.display = 'block';
             const sourceText = document.getElementById('sourceText').value;
             const lines = sourceText.split('\n');
             const selectedLanguages = Array.from(document.querySelectorAll('input[type="checkbox"]:checked')).map(checkbox => supportedLanguages.find(lang => lang.id === checkbox.id));
@@ -116,6 +117,7 @@
                             a.click();
                         });
                     };
+                     loadingSpinner.style.display = 'none';
                 }
             }
         }
@@ -125,9 +127,9 @@
     <h1>String Translation Tool</h1>
     <div>
         <textarea id="sourceText" placeholder="Enter strings to translate" rows="10" cols="50">
-<string name="may_be_later">Not now</string>
-<string name="thank_u">Thank you!</string>
-<string name="rate">Rate</string>
+            <string name="may_be_later">Not now</string>
+            <string name="thank_u">Thank you!</string>
+            <string name="rate">Rate</string>
         </textarea>
     </div>
     <div>
@@ -135,6 +137,10 @@
         <div id="languageCheckboxes"></div>
     </div>
     <button onclick="performTranslation()">Translate</button>
+    <div id="loadingSpinner" style="display: none;">
+        <div class="spinner"></div>
+        <p>Loading... Please wait</p>
+    </div>
     <button id="downloadButton">Download ZIP</button>
 
     <table id="resultTable">
