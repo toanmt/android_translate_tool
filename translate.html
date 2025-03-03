@@ -26,15 +26,40 @@
     <script>
         const sourceLang = 'en'; // Source language
         const supportedLanguages = [
-            { id: 'French', value: 'fr' },
-            { id: 'Spanish', value: 'es' },
-            { id: 'German', value: 'de' },
+            { id: 'English', value: 'en' },
+            { id: 'Chinese (Simplified)', value: 'zh-CN' },
+            { id: 'Chinese (Traditional)', value: 'zh-TW' },
             { id: 'Hindi', value: 'hi' },
+            { id: 'Spanish', value: 'es' },
+            { id: 'Portuguese (Brazil)', value: 'pt-BR' },
+            { id: 'Portuguese (Portugal)', value: 'pt-PT' },
+            { id: 'French', value: 'fr' },
+            { id: 'Arabic', value: 'ar' },
+            { id: 'Bengali', value: 'bn' },
+            { id: 'Russian', value: 'ru' },
+            { id: 'German', value: 'de' },
             { id: 'Japanese', value: 'ja' },
+            { id: 'Turkish', value: 'tr' },
             { id: 'Korean', value: 'ko' },
-            { id: 'Portuguese', value: 'pt' },
-            { id: 'Indonesian', value: 'id' },
-            { id: 'Filipino', value: 'tl' }
+            { id: 'Indonesian', value: 'id' }
+        ];
+        const folderLanguages = [
+            { id: 'English', value: 'values' },
+            { id: 'Chinese (Simplified)', value: 'values-zh-rCN' },
+            { id: 'Chinese (Traditional)', value: 'values-zh-rTW' },
+            { id: 'Hindi', value: 'values-hi' },
+            { id: 'Spanish', value: 'values-es' },
+            { id: 'Portuguese (Brazil)', value: 'values-pt-rBR' },
+            { id: 'Portuguese (Portugal)', value: 'values-pt' },
+            { id: 'French', value: 'values-fr' },
+            { id: 'Arabic', value: 'values-ar' },
+            { id: 'Bengali', value: 'values-bn' },
+            { id: 'Russian', value: 'values-ru' },
+            { id: 'German', value: 'values-de' },
+            { id: 'Japanese', value: 'values-ja' },
+            { id: 'Turkish', value: 'values-tr' },
+            { id: 'Korean', value: 'values-ko' },
+            { id: 'Indonesian', value: 'values-in' }
         ];
 
         async function translateText(targetLang, sourceText) {
@@ -81,7 +106,8 @@
                 }
 
                 const fileContent = `<?xml version="1.0" encoding="utf-8"?>\n<resources>\n${translatedLines.join('\n')}\n</resources>`;
-                zip.file(`values-${language.value}/strings.xml`, fileContent);
+                const folderName = folderLanguages.find(lang => lang.id === language.value)
+                zip.file(`${folderName.value}/strings.xml`, fileContent);
 
                 const row = document.createElement('tr');
                 const languageCell = document.createElement('td');
