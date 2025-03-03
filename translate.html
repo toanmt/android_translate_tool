@@ -106,7 +106,7 @@
                 }
 
                 const fileContent = `<?xml version="1.0" encoding="utf-8"?>\n<resources>\n${translatedLines.join('\n')}\n</resources>`;
-                const folderName = folderLanguages.find(lang => lang.id === language.value)
+                const folderName = folderLanguages.find(lang => lang.id === language.id).value
                 zip.file(`${folderName.value}/strings.xml`, fileContent);
 
                 const row = document.createElement('tr');
