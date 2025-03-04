@@ -23,8 +23,9 @@
             display: none;
         }
     </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <script>
-        const sourceLang = 'en'; // Source language
+        const sourceLang = 'en';
         const supportedLanguages = [
             { id: 'English', value: 'en' },
             { id: 'Chinese (Simplified)', value: 'zh-CN' },
@@ -43,143 +44,101 @@
             { id: 'Korean', value: 'ko' },
             { id: 'Indonesian', value: 'id' }
         ];
-        const folderLanguages = [
-            { id: 'English', value: 'values' },
-            { id: 'Chinese (Simplified)', value: 'values-zh-rCN' },
-            { id: 'Chinese (Traditional)', value: 'values-zh-rTW' },
-            { id: 'Hindi', value: 'values-hi' },
-            { id: 'Spanish', value: 'values-es' },
-            { id: 'Portuguese (Brazil)', value: 'values-pt-rBR' },
-            { id: 'Portuguese (Portugal)', value: 'values-pt' },
-            { id: 'French', value: 'values-fr' },
-            { id: 'Arabic', value: 'values-ar' },
-            { id: 'Bengali', value: 'values-bn' },
-            { id: 'Russian', value: 'values-ru' },
-            { id: 'German', value: 'values-de' },
-            { id: 'Japanese', value: 'values-ja' },
-            { id: 'Turkish', value: 'values-tr' },
-            { id: 'Korean', value: 'values-ko' },
-            { id: 'Indonesian', value: 'values-in' }
-        ];
+        const folderLanguages = supportedLanguages.map(lang => ({ id: lang.id, value: `values-${lang.value}` }));
 
         async function translateText(targetLang, sourceText) {
-            const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=${sourceLang}&tl=${targetLang}&dt=t&q=${encodeURI(sourceText)}`;
             try {
+                const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=${sourceLang}&tl=${targetLang}&dt=t&q=${encodeURIComponent(sourceText)}`;
                 const response = await fetch(url);
-                if (!response.ok) {
-                    throw new Error('Network response was not ok');
-                }
+                if (!response.ok) throw new Error('Translation failed');
                 const result = await response.json();
-                return result[0][0][0]; // Return the translated text
+                return result[0][0][0] || sourceText;
             } catch (error) {
-                console.error('Error:', error);
-                return 'Error during translation';
+                console.error('Translation error:', error);
+                return sourceText;
             }
         }
 
-        async function performTranslation() {
-            loadingSpinner.style.display = 'block';
+        async function translateAndGenerateFiles() {
+            document.getElementById('loadingSpinner').style.display = 'block';
             const sourceText = document.getElementById('sourceText').value;
             const lines = sourceText.split('\n');
-            const selectedLanguages = Array.from(document.querySelectorAll('input[type="checkbox"]:checked')).map(checkbox => supportedLanguages.find(lang => lang.id === checkbox.id));
+            const selectedLanguages = Array.from(document.querySelectorAll('input[type="checkbox"]:checked'))
+                .map(checkbox => supportedLanguages.find(lang => lang.id === checkbox.id));
             const resultTable = document.getElementById('resultTable');
-
             resultTable.innerHTML = '';
-
             const zip = new JSZip();
-            let completedTranslations = 0;
-
-            for (const language of selectedLanguages) {
-                const translatedLines = [];
-                for (const line of lines) {
-                    const nameMatch = line.match(/<string name="(.+?)">(.+)<\/string>/);
-                    if (nameMatch) {
-                        const nameAttribute = nameMatch[1];
-                        const value = nameMatch[2];
-                        let translatedText = await translateText(language.value, value);
-
-                        // Replace single quotes with escaped single quotes
-                        translatedText = translatedText.replace(/'/g, "\\'");
-
-                        translatedLines.push(`<string name="${nameAttribute}">${translatedText}</string>`);
+            
+            await Promise.all(selectedLanguages.map(async (language) => {
+                const translatedLines = await Promise.all(lines.map(async (line) => {
+                    const match = line.match(/<string name="(.+?)">(.+)<\/string>/);
+                    if (match) {
+                        const translatedText = await translateText(language.value, match[2]);
+                        return `<string name="${match[1]}">${translatedText.replace(/'/g, "’")}</string>`;
                     }
-                }
+                    return line;
+                }));
 
                 const fileContent = `<?xml version="1.0" encoding="utf-8"?>\n<resources>\n${translatedLines.join('\n')}\n</resources>`;
-                const folderName = folderLanguages.find(lang => lang.id === language.id).value
+                const folderName = folderLanguages.find(lang => lang.id === language.id).value;
                 zip.file(`${folderName}/strings.xml`, fileContent);
+                appendResultRow(language.id, fileContent);
+            }));
 
-                const row = document.createElement('tr');
-                const languageCell = document.createElement('td');
-                languageCell.textContent = language.id;
+            document.getElementById('downloadButton').style.display = 'block';
+            document.getElementById('downloadButton').onclick = () => downloadZip(zip);
+            document.getElementById('loadingSpinner').style.display = 'none';
+        }
 
-                const copyButton = document.createElement('button');
-                copyButton.textContent = 'Copy';
-                copyButton.onclick = () => {
-                    navigator.clipboard.writeText(fileContent);
-                    alert('Copied to clipboard!');
-                };
+        function appendResultRow(language, content) {
+            const row = document.createElement('tr');
+            const langCell = document.createElement('td');
+            langCell.textContent = language;
+            const copyButton = document.createElement('button');
+            copyButton.textContent = 'Copy';
+            copyButton.onclick = () => {
+                navigator.clipboard.writeText(content);
+                alert('Copied to clipboard!');
+            };
+            langCell.appendChild(copyButton);
+            row.appendChild(langCell);
+            
+            const translationCell = document.createElement('td');
+            translationCell.textContent = content;
+            row.appendChild(translationCell);
+            
+            document.getElementById('resultTable').appendChild(row);
+        }
 
-                languageCell.appendChild(copyButton);
-                row.appendChild(languageCell);
-
-                const translationCell = document.createElement('td');
-                translationCell.textContent = fileContent;
-                row.appendChild(translationCell);
-
-                resultTable.appendChild(row);
-
-                completedTranslations++;
-
-                // Show download button once all translations are done
-                if (completedTranslations === selectedLanguages.length) {
-                    const downloadButton = document.getElementById('downloadButton');
-                    downloadButton.style.display = 'block';
-                    downloadButton.onclick = () => {
-                        zip.generateAsync({ type: 'blob' }).then(content => {
-                            const a = document.createElement('a');
-                            a.href = URL.createObjectURL(content);
-                            a.download = 'translations.zip';
-                            a.click();
-                        });
-                    };
-                     loadingSpinner.style.display = 'none';
-                }
-            }
+        function downloadZip(zip) {
+            zip.generateAsync({ type: 'blob' }).then(content => {
+                const a = document.createElement('a');
+                a.href = URL.createObjectURL(content);
+                a.download = 'translations.zip';
+                a.click();
+            });
         }
     </script>
 </head>
 <body>
     <h1>String Translation Tool</h1>
-    <div>
-        <textarea id="sourceText" placeholder="Enter strings to translate" rows="10" cols="50">
-            <string name="may_be_later">Not now</string>
-            <string name="thank_u">Thank you!</string>
-            <string name="rate">Rate</string>
-        </textarea>
-    </div>
-    <div>
-        <h3>Select languages to translate to:</h3>
-        <div id="languageCheckboxes"></div>
-    </div>
-    <button onclick="performTranslation()">Translate</button>
-    <div id="loadingSpinner" style="display: none;">
-        <div class="spinner"></div>
-        <p>Loading... Please wait</p>
-    </div>
+    <textarea id="sourceText" placeholder="Enter strings to translate" rows="10" cols="50">
+        <string name="may_be_later">Not now</string>
+        <string name="thank_u">Thank you!</string>
+        <string name="rate">Rate</string>
+    </textarea>
+    <h3>Select languages to translate to:</h3>
+    <div id="languageCheckboxes"></div>
+    <button onclick="translateAndGenerateFiles()">Translate</button>
+    <div id="loadingSpinner" style="display: none;">Loading... Please wait</div>
     <button id="downloadButton">Download ZIP</button>
-
-    <table id="resultTable">
-        <!-- Translated results will be displayed here -->
-    </table>
-
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <table id="resultTable"></table>
     <script>
         const languageCheckboxesContainer = document.getElementById('languageCheckboxes');
         supportedLanguages.forEach(lang => {
-            const checkbox = document.createElement('label');
-            checkbox.innerHTML = `<input type="checkbox" id="${lang.id}" value="${lang.value}"> ${lang.id}</label><br>`;
-            languageCheckboxesContainer.appendChild(checkbox);
+            const label = document.createElement('label');
+            label.innerHTML = `<input type="checkbox" id="${lang.id}" value="${lang.value}"> ${lang.id}<br>`;
+            languageCheckboxesContainer.appendChild(label);
         });
     </script>
 </body>
