@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>String Translation Tool</title>
+    <style>
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        table, th, td {
+            border: 1px solid black;
+        }
+        th, td {
+            padding: 10px;
+            text-align: left;
+        }
+        #resultTable {
+            margin-top: 20px;
+        }
+        #downloadButton {
+            display: none;
+        }
+        #progressContainer {
+            display: none;
+            margin-top: 10px;
+        }
+        #progressBar {
+            width: 0%;
+            height: 20px;
+            background-color: green;
+            text-align: center;
+            color: white;
+        }
+    </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script>
+        const sourceLang = 'en';
+        const supportedLanguages = [
+            { id: 'English', value: 'en' },
+            { id: 'Chinese (Simplified)', value: 'zh-CN' },
+            { id: 'Chinese (Traditional)', value: 'zh-TW' },
+            { id: 'Hindi', value: 'hi' },
+            { id: 'Spanish', value: 'es' },
+            { id: 'Portuguese (Brazil)', value: 'pt-BR' },
+            { id: 'Portuguese (Portugal)', value: 'pt-PT' },
+            { id: 'French', value: 'fr' },
+            { id: 'Arabic', value: 'ar' },
+            { id: 'Bengali', value: 'bn' },
+            { id: 'Russian', value: 'ru' },
+            { id: 'German', value: 'de' },
+            { id: 'Japanese', value: 'ja' },
+            { id: 'Turkish', value: 'tr' },
+            { id: 'Korean', value: 'ko' },
+            { id: 'Indonesian', value: 'id' }
+        ];
+        const folderLanguages = {
+            'en': 'values',
+            'zh-CN': 'values-zh-rCN',
+            'zh-TW': 'values-zh-rTW',
+            'hi': 'values-hi',
+            'es': 'values-es',
+            'pt-BR': 'values-pt-rBR',
+            'pt-PT': 'values-pt',
+            'fr': 'values-fr',
+            'ar': 'values-ar',
+            'bn': 'values-bn',
+            'ru': 'values-ru',
+            'de': 'values-de',
+            'ja': 'values-ja',
+            'tr': 'values-tr',
+            'ko': 'values-ko',
+            'id': 'values-in'
+        };
+
+        async function translateBatch(targetLang, texts) {
+            const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=${sourceLang}&tl=${targetLang}&dt=t&q=${encodeURIComponent(texts.join("\n"))}`;
+            try {
+                const response = await fetch(url);
+                if (!response.ok) throw new Error('Network error');
+                const result = await response.json();
+                return result[0].map(item => item[0]); // Return translated texts as an array
+            } catch (error) {
+                console.error('Error:', error);
+                return texts.map(() => 'Translation Error');
+            }
+        }
+
+        async function performTranslation() {
+            const sourceText = document.getElementById('sourceText').value.trim();
+            if (!sourceText) return alert('Please enter text to translate.');
+
+            const lines = sourceText.split('\n').map(line => line.trim()).filter(line => line);
+            const selectedLanguages = Array.from(document.querySelectorAll('input[type="checkbox"]:checked'))
+                .map(checkbox => supportedLanguages.find(lang => lang.id === checkbox.id));
+
+            if (selectedLanguages.length === 0) return alert('Please select at least one language.');
+
+            const resultTable = document.getElementById('resultTable');
+            resultTable.innerHTML = '';
+            document.getElementById('downloadButton').style.display = 'none';
+
+            const progressContainer = document.getElementById('progressContainer');
+            const progressBar = document.getElementById('progressBar');
+            progressContainer.style.display = 'block';
+            progressBar.style.width = '0%';
+
+            const zip = new JSZip();
+            let completedTranslations = 0;
+
+            for (const language of selectedLanguages) {
+                const translations = await translateBatch(language.value, lines.map(line => {
+                    const match = line.match(/<string name="(.+?)">(.+)<\/string>/);
+                    return match ? match[2] : '';
+                }));
+
+                const translatedLines = lines.map((line, index) => {
+                    const match = line.match(/<string name="(.+?)">(.+)<\/string>/);
+                    if (!match) return line;
+                    const nameAttr = match[1];
+                    const translatedText = translations[index].replace(/"/g, '&quot;').replace(/'/g, "\\'");
+                    return `<string name="${nameAttr}">${translatedText}</string>`;
+                });
+
+                const fileContent = `<?xml version="1.0" encoding="utf-8"?>\n<resources>\n${translatedLines.join('\n')}\n</resources>`;
+                zip.folder(folderLanguages[language.value]).file("strings.xml", fileContent);
+
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${language.id} <button onclick="copyToClipboard('${language.id}')">Copy</button></td>
+                    <td><pre id="content-${language.id}">${fileContent}</pre></td>
+                `;
+                resultTable.appendChild(row);
+
+                completedTranslations++;
+                progressBar.style.width = `${(completedTranslations / selectedLanguages.length) * 100}%`;
+            }
+
+            document.getElementById('downloadButton').style.display = 'block';
+            document.getElementById('downloadButton').onclick = () => {
+                zip.generateAsync({ type: 'blob' }).then(content => {
+                    const a = document.createElement('a');
+                    a.href = URL.createObjectURL(content);
+                    a.download = 'translations.zip';
+                    a.click();
+                });
+            };
+
+            progressContainer.style.display = 'none';
+        }
+
+        function copyToClipboard(languageId) {
+            const content = document.getElementById(`content-${languageId}`).textContent;
+            navigator.clipboard.writeText(content).then(() => alert('Copied to clipboard!'));
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const languageCheckboxesContainer = document.getElementById('languageCheckboxes');
+            supportedLanguages.forEach(lang => {
+                const checkbox = document.createElement('label');
+                checkbox.innerHTML = `<input type="checkbox" id="${lang.id}" value="${lang.value}"> ${lang.id}</label><br>`;
+                languageCheckboxesContainer.appendChild(checkbox);
+            });
+        });
+    </script>
+</head>
+<body>
+    <h1>String Translation Tool</h1>
+    <textarea id="sourceText" placeholder="Enter strings to translate" rows="10" cols="50"></textarea>
+    <h3>Select languages to translate to:</h3>
+    <div id="languageCheckboxes"></div>
+    <button onclick="performTranslation()">Translate</button>
+    
+    <div id="progressContainer">
+        <div id="progressBar">0%</div>
+    </div>
+
+    <button id="downloadButton">Download ZIP</button>
+    <table id="resultTable"></table>
+</body>
+</html>
