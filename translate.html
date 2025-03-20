@@ -45,7 +45,10 @@
             { id: 'Indonesian', value: 'id' },
             { id: 'Vietnam', value: 'vi' }
         ];
-        const folderLanguages = supportedLanguages.map(lang => ({ id: lang.id, value: `values-${lang.value}` }));
+        const folderLanguages = supportedLanguages.map(lang => ({
+            id: lang.id,
+            value: `values-${lang.value.includes('-') ? 'r' + lang.value : lang.value}`
+        }));
 
         async function translateText(targetLang, sourceText) {
             try {
