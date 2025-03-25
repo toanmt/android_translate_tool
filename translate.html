@@ -25,6 +25,7 @@
     </style>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <script>
+        const sourceLang ='en
         const supportedLanguages = [
             { id: 'English', value: 'en' },
             { id: 'Chinese (Simplified)', value: 'zh-CN' },
@@ -51,7 +52,7 @@
 
         async function translateText(targetLang, sourceText) {
             try {
-                const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=${targetLang}&dt=t&q=${encodeURIComponent(sourceText)}`;
+                const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=${sourceLang}&tl=${targetLang}&dt=t&q=${encodeURIComponent(sourceText)}`;
                 const response = await fetch(url);
                 if (!response.ok) throw new Error('Translation failed');
                 const result = await response.json();
