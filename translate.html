@@ -47,7 +47,7 @@
         ];
         const folderLanguages = supportedLanguages.map(lang => ({
             id: lang.id,
-            value: `values-${lang.value === 'id' ? 'in' : (lang.value.includes('-') ? 'r' + lang.value : lang.value)}`
+            value: `values-${lang.value === 'id' ? 'in' : (lang.value.replace('-','-r'))}`
         }));
 
         async function translateText(targetLang, sourceText) {
